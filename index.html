@@ -646,7 +646,10 @@
     <a href="#pricing">Pricing</a>
     <a href="#waitlist">Early Access</a>
   </div>
-  <button class="nav-cta" onclick="goTo('waitlist')">Join Waitlist →</button>
+  <div style="display:flex;gap:.65rem;align-items:center">
+    <a href="app.html" style="color:var(--brand2);font-size:.9rem;font-weight:500;text-decoration:none;padding:.5rem .9rem;border:1px solid rgba(56,226,176,0.3);border-radius:8px;transition:all .2s" onmouseover="this.style.background='rgba(56,226,176,0.1)'" onmouseout="this.style.background='transparent'">Login →</a>
+    <button class="nav-cta" onclick="window.location.href='app.html'">Join Waitlist</button>
+  </div>
   <button class="hamburger" id="hamburger" onclick="toggleMenu()" aria-label="Menu">
     <span></span><span></span><span></span>
   </button>
@@ -658,6 +661,7 @@
   <a href="#features" onclick="closeMenu()">Features</a>
   <a href="#pricing"  onclick="closeMenu()">Pricing</a>
   <a href="#waitlist" onclick="closeMenu()">Early Access</a>
+  <a href="app.html"  style="color:var(--brand2);font-weight:500" onclick="closeMenu()">Login / Signup →</a>
   <button class="mob-cta" onclick="goTo('waitlist');closeMenu()">Join Waitlist — Get 40% Off →</button>
 </div>
 
@@ -676,7 +680,7 @@
       <h1>Your AI chatbot.<br>Live in <span class="accent">10 minutes.</span></h1>
       <p class="hero-sub">Paste two lines of code. Get a branded AI chatbot answering questions, capturing leads, and converting visitors — 24/7 on autopilot.</p>
       <div class="hero-actions">
-        <button class="btn-primary" onclick="goTo('waitlist')">Get Early Access — Free</button>
+        <button class="btn-primary" onclick="window.location.href='app.html'">Get Early Access — Free</button>
         <button class="btn-ghost"   onclick="goTo('how')">See How It Works ↓</button>
       </div>
       <div class="hero-stats">
@@ -819,7 +823,7 @@
           <div class="pf dim"><span class="ck">—</span> Lead capture</div>
           <div class="pf dim"><span class="ck">—</span> CRM integrations</div>
         </div>
-        <button class="plan-btn outline" onclick="goTo('waitlist')">Get Early Access</button>
+        <button class="plan-btn outline" onclick="window.location.href='app.html'">Get Early Access</button>
       </div>
 
       <div class="plan popular">
@@ -835,7 +839,7 @@
           <div class="pf"><span class="ck">✓</span> Priority support</div>
           <div class="pf dim"><span class="ck">—</span> Agency dashboard</div>
         </div>
-        <button class="plan-btn filled" onclick="goTo('waitlist')">Get Early Access</button>
+        <button class="plan-btn filled" onclick="window.location.href='app.html'">Get Early Access</button>
       </div>
 
       <div class="plan">
@@ -850,7 +854,7 @@
           <div class="pf"><span class="ck">✓</span> Custom AI training</div>
           <div class="pf"><span class="ck">✓</span> Dedicated success manager</div>
         </div>
-        <button class="plan-btn outline" onclick="goTo('waitlist')">Get Early Access</button>
+        <button class="plan-btn outline" onclick="window.location.href='app.html'">Get Early Access</button>
       </div>
     </div>
 
@@ -898,7 +902,8 @@
         <span class="s-emoji">🎉</span>
         <h3>You're on the list!</h3>
         <p id="wlSuccessMsg">We'll email you as soon as we're ready to onboard you. You've locked in your 40% early access discount.</p>
-        <p style="margin-top:1.5rem;font-size:.78rem;color:var(--muted)">Share with a friend and move up the queue ↗</p>
+        <a href="app.html" style="display:inline-block;margin-top:1rem;background:var(--brand);color:#fff;padding:.7rem 1.75rem;border-radius:10px;font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem;text-decoration:none">Create Your Account →</a>
+        <p style="margin-top:.75rem;font-size:.78rem;color:var(--muted)">Share with a friend and move up the queue ↗</p>
       </div>
     </div>
   </div>
