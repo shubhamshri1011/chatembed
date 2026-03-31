@@ -1,0 +1,1124 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ChatEmbed — Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<!-- Supabase SDK -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- Chart.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0A0E1A;--surface:#111827;--surface2:#1a2235;
+  --brand:#4F8EF7;--brand2:#38E2B0;
+  --text:#F0F4FF;--muted:#8896B0;
+  --border:rgba(255,255,255,0.08);
+  --danger:#F87171;--warn:#FBBF24;--success:#34D399;
+}
+html{scroll-behavior:smooth}
+body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+
+/* ══ LOADING SCREEN ══ */
+#loadingScreen{
+  position:fixed;inset:0;background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:9999;gap:1rem;
+}
+.load-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.8rem}
+.load-logo span{color:var(--brand)}
+.load-spinner{width:32px;height:32px;border:3px solid rgba(79,142,247,0.2);border-top-color:var(--brand);border-radius:50%;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.load-text{font-size:.85rem;color:var(--muted)}
+
+/* ══ AUTH PAGES ══ */
+.auth-page{display:none;min-height:100vh;align-items:center;justify-content:center;padding:1.5rem;position:relative;overflow:hidden}
+.auth-page.active{display:flex}
+.auth-bg{position:absolute;inset:0;background-image:linear-gradient(rgba(79,142,247,0.04) 1px,transparent 1px),linear-gradient(90deg,rgba(79,142,247,0.04) 1px,transparent 1px);background-size:55px 55px;pointer-events:none}
+.auth-glow{position:absolute;top:15%;left:50%;transform:translateX(-50%);width:500px;height:400px;background:radial-gradient(ellipse,rgba(79,142,247,0.1) 0%,transparent 70%);pointer-events:none}
+.auth-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:2.5rem 2rem;width:100%;max-width:420px;position:relative;z-index:1;animation:fadeUp .3s ease}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
+.auth-logo{font-family:'Syne',sans-serif;font-weight:800;font-size:1.4rem;text-align:center;margin-bottom:1.75rem}
+.auth-logo span{color:var(--brand)}
+.auth-title{font-family:'Syne',sans-serif;font-weight:800;font-size:1.5rem;margin-bottom:.3rem;text-align:center}
+.auth-sub{color:var(--muted);font-size:.87rem;text-align:center;margin-bottom:1.75rem;line-height:1.5}
+.divider{display:flex;align-items:center;gap:.75rem;margin:1.25rem 0;color:var(--muted);font-size:.78rem}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.f-field{display:flex;flex-direction:column;gap:.35rem;margin-bottom:.85rem}
+.f-field label{font-size:.8rem;color:var(--muted);font-weight:500}
+.f-input{background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:.8rem 1rem;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.9rem;outline:none;transition:border-color .15s;width:100%}
+.f-input:focus{border-color:var(--brand)}
+.f-input::placeholder{color:var(--muted)}
+.f-row{display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+.pw-wrap{position:relative}
+.pw-wrap .f-input{padding-right:2.75rem}
+.pw-toggle{position:absolute;right:.85rem;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--muted);cursor:pointer;font-size:.85rem;padding:0;transition:color .15s}
+.pw-toggle:hover{color:var(--text)}
+
+.auth-btn{width:100%;padding:.9rem;background:var(--brand);color:#fff;border:none;border-radius:10px;font-family:'Syne',sans-serif;font-size:.97rem;font-weight:700;cursor:pointer;transition:all .2s;display:flex;align-items:center;justify-content:center;gap:.5rem;margin-top:.25rem}
+.auth-btn:hover:not(:disabled){background:#6FA3FF;transform:translateY(-1px)}
+.auth-btn:disabled{opacity:.55;cursor:not-allowed;transform:none}
+.auth-btn.secondary{background:transparent;border:1px solid var(--border);color:var(--text);margin-top:.65rem}
+.auth-btn.secondary:hover:not(:disabled){border-color:var(--brand);color:var(--brand)}
+.auth-btn.google{background:var(--surface2);border:1px solid var(--border);color:var(--text);margin-top:0}
+.auth-btn.google:hover:not(:disabled){border-color:#4285f4;color:#4285f4}
+
+.auth-switch{text-align:center;margin-top:1.25rem;font-size:.83rem;color:var(--muted)}
+.auth-switch a{color:var(--brand);cursor:pointer;text-decoration:none}
+.auth-switch a:hover{text-decoration:underline}
+
+.err-msg{background:rgba(248,113,113,0.1);border:1px solid rgba(248,113,113,0.25);border-radius:8px;padding:.6rem .9rem;font-size:.82rem;color:var(--danger);margin-bottom:.85rem;display:none;line-height:1.5}
+.ok-msg{background:rgba(52,211,153,0.1);border:1px solid rgba(52,211,153,0.25);border-radius:8px;padding:.6rem .9rem;font-size:.82rem;color:var(--success);margin-bottom:.85rem;display:none;line-height:1.5}
+.spinner{width:18px;height:18px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none;flex-shrink:0}
+.forgot-link{text-align:right;font-size:.78rem;color:var(--brand);cursor:pointer;margin-top:-.5rem;margin-bottom:.85rem;display:block}
+.forgot-link:hover{text-decoration:underline}
+
+.steps-dots{display:flex;align-items:center;justify-content:center;gap:.4rem;margin-bottom:1.75rem}
+.sdot{width:8px;height:8px;border-radius:50%;background:var(--border);transition:all .2s}
+.sdot.active{background:var(--brand);width:20px;border-radius:4px}
+.sdot.done{background:var(--brand2)}
+
+.plan-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem;margin-bottom:.85rem}
+.plan-opt{border:1px solid var(--border);border-radius:10px;padding:.75rem;cursor:pointer;transition:all .15s;text-align:center}
+.plan-opt:hover{border-color:var(--brand)}
+.plan-opt.sel{border-color:var(--brand);background:rgba(79,142,247,0.08)}
+.po-name{font-size:.82rem;font-weight:500;margin-bottom:.2rem}
+.po-price{font-size:.72rem;color:var(--muted)}
+
+/* ══ DASHBOARD ══ */
+#dashApp{display:none;min-height:100vh}
+#dashApp.active{display:flex}
+
+.sidebar{width:220px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;height:100vh;position:sticky;top:0;overflow-y:auto;transition:left .25s ease}
+.sb-logo{padding:1.25rem;border-bottom:1px solid var(--border)}
+.brand{font-family:'Syne',sans-serif;font-weight:800;font-size:1.1rem}
+.brand span{color:var(--brand)}
+.plan-badge{display:inline-block;background:rgba(79,142,247,0.15);color:var(--brand);font-size:.63rem;font-weight:500;padding:.12rem .5rem;border-radius:4px;margin-top:.3rem}
+.sb-nav{padding:.65rem;flex:1;display:flex;flex-direction:column;gap:.1rem}
+.nav-sec{font-size:.62rem;font-weight:500;color:#4A5568;text-transform:uppercase;letter-spacing:.08em;padding:.65rem .65rem .25rem}
+.nav-item{display:flex;align-items:center;gap:.6rem;padding:.58rem .75rem;border-radius:8px;font-size:.85rem;color:var(--muted);cursor:pointer;transition:all .15s;border:none;background:none;width:100%;text-align:left}
+.nav-item:hover{background:rgba(255,255,255,0.05);color:var(--text)}
+.nav-item.active{background:rgba(79,142,247,0.12);color:var(--brand)}
+.nav-item svg{width:15px;height:15px;flex-shrink:0;opacity:.7}
+.nav-item.active svg{opacity:1}
+.sb-bottom{padding:.75rem;border-top:1px solid var(--border)}
+.user-row{display:flex;align-items:center;gap:.6rem;padding:.5rem;border-radius:8px;cursor:pointer;transition:background .15s}
+.user-row:hover{background:rgba(255,255,255,0.05)}
+.u-av{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--brand),var(--brand2));display:flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:700;flex-shrink:0}
+.u-name{font-size:.82rem;font-weight:500;line-height:1.2}
+.u-email{font-size:.7rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px}
+.logout-btn{width:100%;margin-top:.5rem;background:transparent;border:1px solid var(--border);color:var(--muted);padding:.45rem;border-radius:7px;font-family:'DM Sans',sans-serif;font-size:.78rem;cursor:pointer;transition:all .15s}
+.logout-btn:hover{border-color:var(--danger);color:var(--danger)}
+
+.main{flex:1;display:flex;flex-direction:column;min-width:0;overflow:hidden}
+.topbar{background:var(--surface);border-bottom:1px solid var(--border);padding:.8rem 1.5rem;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;position:sticky;top:0;z-index:10}
+.page-title{font-family:'Syne',sans-serif;font-weight:700;font-size:1.05rem}
+.tb-right{display:flex;align-items:center;gap:.75rem}
+.notif{width:8px;height:8px;background:var(--brand2);border-radius:50%}
+.tb-btn{background:transparent;border:1px solid var(--border);color:var(--muted);padding:.4rem .9rem;border-radius:7px;font-family:'DM Sans',sans-serif;font-size:.8rem;cursor:pointer;transition:all .15s}
+.tb-btn:hover{border-color:var(--brand);color:var(--brand)}
+.tb-btn.primary{background:var(--brand);border-color:var(--brand);color:#fff}
+.tb-btn.primary:hover{background:#6FA3FF}
+.mob-ham{display:none;flex-direction:column;gap:5px;background:none;border:none;cursor:pointer;padding:.3rem}
+.mob-ham span{display:block;width:20px;height:2px;background:var(--text);border-radius:2px;transition:all .3s}
+.mob-ham.active span:nth-child(1){transform:translateY(7px) rotate(45deg)}
+.mob-ham.active span:nth-child(2){opacity:0}
+.mob-ham.active span:nth-child(3){transform:translateY(-7px) rotate(-45deg)}
+.mob-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:199}
+.mob-overlay.open{display:block}
+
+.content{flex:1;padding:1.5rem;overflow-y:auto;display:flex;flex-direction:column;gap:1.25rem}
+.content::-webkit-scrollbar{width:4px}
+.content::-webkit-scrollbar-thumb{background:rgba(255,255,255,0.1);border-radius:2px}
+.page{display:none;flex-direction:column;gap:1.25rem}
+.page.active{display:flex}
+
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden}
+.card-head{padding:.9rem 1.1rem;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border)}
+.card-title{font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem}
+.card-body{padding:1.1rem}
+
+/* Metrics */
+.metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.85rem}
+.metric{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.1rem}
+.m-lbl{font-size:.68rem;color:var(--muted);font-weight:500;text-transform:uppercase;letter-spacing:.06em;margin-bottom:.4rem}
+.m-val{font-family:'Syne',sans-serif;font-size:1.8rem;font-weight:700;line-height:1}
+.m-ch{font-size:.72rem;margin-top:.35rem}
+.up{color:var(--brand2)}.dn{color:var(--danger)}
+
+/* Usage */
+.usage-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.1rem}
+.usage-top{display:flex;justify-content:space-between;align-items:center;margin-bottom:.65rem}
+.usage-bar{height:8px;background:rgba(255,255,255,0.07);border-radius:4px;overflow:hidden;margin-bottom:.35rem}
+.usage-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--brand),var(--brand2));transition:width .6s}
+.usage-note{font-size:.75rem;color:var(--muted)}
+
+/* Chart */
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:1.1rem}
+.chart-wrap{position:relative;height:190px;margin-top:1rem}
+
+/* Bots */
+.bots-list{display:flex;flex-direction:column;gap:.65rem}
+.bot-card{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:1rem 1.1rem;display:flex;align-items:center;gap:.9rem;transition:border-color .15s;cursor:pointer}
+.bot-card:hover{border-color:rgba(79,142,247,0.35)}
+.bot-av{width:40px;height:40px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.bot-info{flex:1;min-width:0}
+.bot-name{font-weight:500;font-size:.88rem;margin-bottom:.15rem}
+.bot-url{font-size:.73rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bot-stats{display:flex;gap:1.25rem;flex-shrink:0}
+.bs{text-align:right}
+.bs-val{font-size:.88rem;font-weight:500}
+.bs-lbl{font-size:.68rem;color:var(--muted)}
+.status-pill{display:flex;align-items:center;gap:.3rem;font-size:.7rem;font-weight:500;padding:.18rem .55rem;border-radius:100px;flex-shrink:0}
+.live{background:rgba(56,226,176,0.1);color:var(--brand2)}
+.draft{background:rgba(255,255,255,0.06);color:var(--muted)}
+.icon-btn{width:30px;height:30px;border-radius:7px;border:1px solid var(--border);background:transparent;color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;font-size:.85rem}
+.icon-btn:hover{border-color:var(--brand);color:var(--brand)}
+
+/* Table */
+.tbl-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.tbl{width:100%;border-collapse:collapse;font-size:.83rem;min-width:520px}
+.tbl th{text-align:left;font-size:.68rem;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:.6rem .9rem;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.02)}
+.tbl td{padding:.72rem .9rem;border-bottom:1px solid rgba(255,255,255,0.03)}
+.tbl tr:last-child td{border-bottom:none}
+.tbl tr:hover td{background:rgba(255,255,255,0.02)}
+.lead-av{width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:.68rem;font-weight:700}
+.score-wrap{display:flex;flex-direction:column;gap:3px}
+.score-bar{height:3px;border-radius:2px;background:rgba(255,255,255,0.07);overflow:hidden;width:60px}
+.score-fill{height:100%;border-radius:2px;background:var(--brand2)}
+.tag{display:inline-block;font-size:.67rem;font-weight:500;padding:.14rem .45rem;border-radius:4px}
+.hot{background:rgba(248,113,113,0.12);color:var(--danger)}
+.warm{background:rgba(251,191,36,0.12);color:var(--warn)}
+.cold{background:rgba(255,255,255,0.06);color:var(--muted)}
+.empty-state{text-align:center;padding:3rem 1rem;color:var(--muted)}
+.empty-state .e-icon{font-size:2rem;margin-bottom:.75rem}
+.empty-state .e-title{font-size:.95rem;font-weight:500;color:var(--text);margin-bottom:.35rem}
+.empty-state .e-sub{font-size:.83rem;line-height:1.5}
+
+/* Settings */
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.settings-grid .full{grid-column:1/-1}
+.s-field{display:flex;flex-direction:column;gap:.35rem;margin-bottom:.85rem}
+.s-field:last-child{margin-bottom:0}
+.s-field label{font-size:.8rem;color:var(--muted)}
+.s-field input,.s-field select,.s-field textarea{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:.65rem .85rem;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.86rem;outline:none;width:100%;transition:border-color .15s}
+.s-field input:focus,.s-field textarea:focus{border-color:var(--brand)}
+.s-field textarea{resize:vertical;min-height:72px;line-height:1.5}
+.toggle-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem}
+.toggle-row span{font-size:.85rem}
+.tgl{position:relative;width:36px;height:20px;cursor:pointer;flex-shrink:0}
+.tgl input{opacity:0;width:0;height:0;position:absolute}
+.tgl-track{position:absolute;inset:0;background:rgba(255,255,255,0.1);border-radius:10px;transition:background .2s}
+.tgl input:checked+.tgl-track{background:var(--brand)}
+.tgl-thumb{position:absolute;top:3px;left:3px;width:14px;height:14px;background:#fff;border-radius:50%;transition:transform .2s;pointer-events:none}
+.tgl input:checked~.tgl-thumb{transform:translateX(16px)}
+.save-btn{background:var(--brand);color:#fff;border:none;padding:.6rem 1.4rem;border-radius:8px;font-family:'DM Sans',sans-serif;font-size:.85rem;font-weight:500;cursor:pointer;transition:opacity .15s}
+.save-btn:hover{opacity:.85}
+
+/* Billing */
+.billing-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.billing-grid .full{grid-column:1/-1}
+.bill-row{display:flex;justify-content:space-between;align-items:center;padding:.65rem 0;border-bottom:1px solid rgba(255,255,255,0.04);font-size:.83rem}
+.bill-row:last-child{border-bottom:none}
+.paid-tag{background:rgba(52,211,153,0.1);color:var(--success);font-size:.68rem;font-weight:500;padding:.12rem .45rem;border-radius:4px}
+
+/* Quick actions */
+.qa-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.75rem}
+.qa{background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:.9rem 1rem;display:flex;align-items:center;gap:.75rem;cursor:pointer;transition:border-color .15s}
+.qa:hover{border-color:rgba(79,142,247,0.35)}
+.qa-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:.95rem;flex-shrink:0}
+
+/* Embed modal */
+.e-modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center;padding:1rem}
+.e-modal.open{display:flex}
+.e-card{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:1.5rem;width:100%;max-width:460px;animation:fadeUp .2s ease}
+.e-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem}
+.e-title{font-family:'Syne',sans-serif;font-weight:700;font-size:1rem}
+.e-close{background:none;border:none;color:var(--muted);font-size:1.3rem;cursor:pointer}
+.code-box{background:#0D1117;border-radius:9px;padding:.9rem 1rem;position:relative;margin-bottom:1rem}
+.code-box pre{font-family:'Courier New',monospace;font-size:.75rem;color:#7EE787;line-height:1.65;white-space:pre-wrap;word-break:break-all}
+.copy-btn{position:absolute;top:.6rem;right:.6rem;background:rgba(255,255,255,0.08);border:none;color:#aaa;padding:.22rem .6rem;border-radius:5px;font-size:.7rem;cursor:pointer;transition:all .15s}
+.copy-btn:hover{background:rgba(255,255,255,0.15);color:#fff}
+
+/* Toast */
+.toast{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:.75rem 1.1rem;font-size:.84rem;display:flex;align-items:center;gap:.6rem;z-index:999;animation:fadeUp .25s ease;box-shadow:0 8px 24px rgba(0,0,0,.4);display:none}
+.toast.show{display:flex}
+.toast.success{border-color:rgba(52,211,153,0.3)}
+.toast.error{border-color:rgba(248,113,113,0.3)}
+
+/* Responsive */
+.mob-sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:199}
+.mob-sidebar-overlay.open{display:block}
+
+@media(max-width:900px){
+  .mob-ham{display:flex}
+  .sidebar{position:fixed;left:-220px;top:0;bottom:0;z-index:200;transition:left .25s ease;box-shadow:4px 0 24px rgba(0,0,0,.4)}
+  .sidebar.open{left:0}
+  .metrics{grid-template-columns:1fr 1fr}
+  .settings-grid{grid-template-columns:1fr}
+  .billing-grid{grid-template-columns:1fr}
+  .qa-grid{grid-template-columns:1fr 1fr}
+  .content{padding:1rem}
+  .topbar{padding:.75rem 1rem}
+}
+@media(max-width:600px){
+  .metrics{grid-template-columns:1fr 1fr;gap:.6rem}
+  .m-val{font-size:1.5rem}
+  .qa-grid{grid-template-columns:1fr 1fr;gap:.6rem}
+  .content{padding:.75rem}
+  .bot-card{flex-wrap:wrap}
+  .bot-stats{display:none}
+  .f-row{grid-template-columns:1fr}
+  .auth-card{padding:2rem 1.25rem}
+  .plan-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:400px){
+  .metrics{grid-template-columns:1fr}
+  .qa-grid{grid-template-columns:1fr}
+  .tb-btn:not(.primary){display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- LOADING -->
+<div id="loadingScreen">
+  <div class="load-logo">Chat<span>Embed</span></div>
+  <div class="load-spinner"></div>
+  <div class="load-text">Loading...</div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- ══ LOGIN ══ -->
+<div class="auth-page" id="loginPage">
+  <div class="auth-bg"></div><div class="auth-glow"></div>
+  <div class="auth-card">
+    <div class="auth-logo">Chat<span>Embed</span></div>
+    <div class="auth-title">Welcome back 👋</div>
+    <div class="auth-sub">Sign in to manage your AI chatbots</div>
+    <button class="auth-btn google" onclick="googleLogin()">🌐 &nbsp;Continue with Google</button>
+    <div class="divider">or sign in with email</div>
+    <div class="err-msg" id="loginErr"></div>
+    <div class="ok-msg"  id="loginOk"></div>
+    <div class="f-field"><label>Email Address</label><input class="f-input" type="email" id="loginEmail" placeholder="you@example.com" onkeydown="if(event.key==='Enter')doLogin()"></div>
+    <div class="f-field">
+      <label>Password</label>
+      <div class="pw-wrap">
+        <input class="f-input" type="password" id="loginPw" placeholder="Your password" onkeydown="if(event.key==='Enter')doLogin()">
+        <button class="pw-toggle" onclick="togglePw('loginPw',this)" tabindex="-1">👁</button>
+      </div>
+    </div>
+    <a class="forgot-link" onclick="showAuth('forgotPage')">Forgot password?</a>
+    <button class="auth-btn" id="loginBtn" onclick="doLogin()">
+      <span id="loginTxt">Sign In →</span><div class="spinner" id="loginSp"></div>
+    </button>
+    <div class="auth-switch">No account? <a onclick="showAuth('signupPage')">Create one free</a></div>
+  </div>
+</div>
+
+<!-- ══ SIGNUP ══ -->
+<div class="auth-page" id="signupPage">
+  <div class="auth-bg"></div><div class="auth-glow"></div>
+  <div class="auth-card">
+    <div class="auth-logo">Chat<span>Embed</span></div>
+    <div class="steps-dots">
+      <div class="sdot active" id="sd1"></div>
+      <div class="sdot" id="sd2"></div>
+      <div class="sdot" id="sd3"></div>
+    </div>
+
+    <!-- Step 1 -->
+    <div id="step1">
+      <div class="auth-title">Create account</div>
+      <div class="auth-sub">Free 14-day trial — no card needed</div>
+      <button class="auth-btn google" onclick="googleLogin()">🌐 &nbsp;Continue with Google</button>
+      <div class="divider">or use email</div>
+      <div class="err-msg" id="s1Err"></div>
+      <div class="f-row">
+        <div class="f-field"><label>First Name</label><input class="f-input" type="text" id="s1Fname" placeholder="Rahul"></div>
+        <div class="f-field"><label>Last Name</label><input class="f-input" type="text" id="s1Lname" placeholder="Sharma"></div>
+      </div>
+      <div class="f-field"><label>Email</label><input class="f-input" type="email" id="s1Email" placeholder="rahul@mybiz.com"></div>
+      <div class="f-field"><label>Password</label>
+        <div class="pw-wrap">
+          <input class="f-input" type="password" id="s1Pw" placeholder="Min 8 characters">
+          <button class="pw-toggle" onclick="togglePw('s1Pw',this)" tabindex="-1">👁</button>
+        </div>
+      </div>
+      <button class="auth-btn" onclick="nextStep(1)">Continue →</button>
+      <div class="auth-switch">Have account? <a onclick="showAuth('loginPage')">Sign in</a></div>
+    </div>
+
+    <!-- Step 2 -->
+    <div id="step2" style="display:none">
+      <div class="auth-title">Your business</div>
+      <div class="auth-sub">Help us personalize your experience</div>
+      <div class="err-msg" id="s2Err"></div>
+      <div class="f-field"><label>Business Name</label><input class="f-input" type="text" id="s2Biz" placeholder="My Agency / Store"></div>
+      <div class="f-field"><label>Website URL</label><input class="f-input" type="url" id="s2Url" placeholder="https://mywebsite.com"></div>
+      <div class="f-field"><label>Industry</label>
+        <select class="f-input" id="s2Ind">
+          <option value="">Select industry</option>
+          <option>Digital Agency</option><option>E-Commerce</option>
+          <option>SaaS / Tech</option><option>Healthcare</option>
+          <option>Real Estate</option><option>Education</option>
+          <option>Finance</option><option>Other</option>
+        </select>
+      </div>
+      <button class="auth-btn" onclick="nextStep(2)">Continue →</button>
+      <button class="auth-btn secondary" onclick="gotoStep(1)">← Back</button>
+    </div>
+
+    <!-- Step 3 -->
+    <div id="step3" style="display:none">
+      <div class="auth-title">Choose plan</div>
+      <div class="auth-sub">Start free — upgrade anytime. 40% off first 3 months!</div>
+      <div class="err-msg" id="s3Err"></div>
+      <div class="plan-grid">
+        <div class="plan-opt sel" data-plan="free_trial" onclick="selPlan(this)"><div class="po-name">🆓 Free Trial</div><div class="po-price">14 days</div></div>
+        <div class="plan-opt" data-plan="starter" onclick="selPlan(this)"><div class="po-name">🚀 Starter</div><div class="po-price">₹2,499/mo</div></div>
+        <div class="plan-opt" data-plan="growth" onclick="selPlan(this)"><div class="po-name">📈 Growth</div><div class="po-price">₹7,999/mo</div></div>
+        <div class="plan-opt" data-plan="scale" onclick="selPlan(this)"><div class="po-name">🏢 Scale</div><div class="po-price">₹24,999/mo</div></div>
+      </div>
+      <button class="auth-btn" id="s3Btn" onclick="completeSignup()">
+        <span id="s3Txt">Create Account →</span><div class="spinner" id="s3Sp"></div>
+      </button>
+      <button class="auth-btn secondary" onclick="gotoStep(2)">← Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ FORGOT ══ -->
+<div class="auth-page" id="forgotPage">
+  <div class="auth-bg"></div>
+  <div class="auth-card">
+    <div class="auth-logo">Chat<span>Embed</span></div>
+    <div class="auth-title">Reset password 🔑</div>
+    <div class="auth-sub">Enter your email — we'll send a reset link</div>
+    <div class="err-msg" id="forgotErr"></div>
+    <div class="ok-msg"  id="forgotOk"></div>
+    <div class="f-field"><label>Email</label><input class="f-input" type="email" id="forgotEmail" placeholder="you@example.com"></div>
+    <button class="auth-btn" onclick="doForgot()">
+      <span id="forgotTxt">Send Reset Link →</span><div class="spinner" id="forgotSp"></div>
+    </button>
+    <button class="auth-btn secondary" onclick="showAuth('loginPage')">← Back to Login</button>
+  </div>
+</div>
+
+<!-- ══ DASHBOARD ══ -->
+<div id="dashApp">
+  <div class="mob-sidebar-overlay" id="mobOverlay" onclick="closeSidebar()"></div>
+  <div class="sidebar" id="mainSidebar">
+    <div class="sb-logo">
+      <div class="brand">Chat<span>Embed</span></div>
+      <div class="plan-badge" id="planBadge">Free Trial</div>
+    </div>
+    <div class="sb-nav">
+      <div class="nav-sec">Main</div>
+      <button class="nav-item active" onclick="goPage('overview',this)">
+        <svg viewBox="0 0 16 16" fill="currentColor"><rect x="1" y="1" width="6" height="6" rx="1"/><rect x="9" y="1" width="6" height="6" rx="1"/><rect x="1" y="9" width="6" height="6" rx="1"/><rect x="9" y="9" width="6" height="6" rx="1"/></svg>Overview
+      </button>
+      <button class="nav-item" onclick="goPage('bots',this)">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="4" width="12" height="9" rx="2"/><path d="M5 4V3a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v1"/><circle cx="5.5" cy="8.5" r="1"/><circle cx="10.5" cy="8.5" r="1"/><path d="M6.5 11h3"/></svg>My Bots
+      </button>
+      <button class="nav-item" onclick="goPage('leads',this)">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="6" cy="5" r="3"/><path d="M1 13c0-2.8 2.2-5 5-5"/><circle cx="12" cy="11" r="3"/><path d="M12 9v2l1 1"/></svg>Leads
+      </button>
+      <button class="nav-item" onclick="goPage('analytics',this)">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="1,11 5,7 8,9 11,5 15,3"/></svg>Analytics
+      </button>
+      <div class="nav-sec">Account</div>
+      <button class="nav-item" onclick="goPage('settings',this)">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="8" cy="8" r="2"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.2 3.2l1.4 1.4M11.4 11.4l1.4 1.4M3.2 12.8l1.4-1.4M11.4 4.6l1.4-1.4"/></svg>Settings
+      </button>
+      <button class="nav-item" onclick="goPage('billing',this)">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1" y="4" width="14" height="9" rx="1.5"/><path d="M1 7h14"/></svg>Billing
+      </button>
+    </div>
+    <div class="sb-bottom">
+      <div class="user-row">
+        <div class="u-av" id="uAv">--</div>
+        <div><div class="u-name" id="uName">Loading...</div><div class="u-email" id="uEmail">...</div></div>
+      </div>
+      <button class="logout-btn" onclick="doLogout()">Sign Out</button>
+    </div>
+  </div>
+
+  <div class="main">
+    <div class="topbar">
+      <div style="display:flex;align-items:center;gap:.75rem">
+        <button class="mob-ham" id="mobHam" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
+        <div class="page-title" id="pageTitle">Overview</div>
+      </div>
+      <div class="tb-right">
+        <div class="notif"></div>
+        <button class="tb-btn" onclick="window.location.href='pricing.html'">Upgrade</button>
+        <button class="tb-btn primary" onclick="openEmbed()">+ New Bot</button>
+      </div>
+    </div>
+
+    <div class="content">
+
+      <!-- OVERVIEW -->
+      <div class="page active" id="page-overview">
+        <div class="metrics">
+          <div class="metric"><div class="m-lbl">Conversations</div><div class="m-val" id="m-convos">0</div><div class="m-ch up" id="m-convos-ch"></div></div>
+          <div class="metric"><div class="m-lbl">Leads</div><div class="m-val" id="m-leads">0</div><div class="m-ch up" id="m-leads-ch"></div></div>
+          <div class="metric"><div class="m-lbl">Resolution Rate</div><div class="m-val">78%</div><div class="m-ch up">↑ 5% this month</div></div>
+          <div class="metric"><div class="m-lbl">Active Bots</div><div class="m-val" id="m-bots">0</div><div class="m-ch" style="color:var(--muted)" id="m-bots-ch"></div></div>
+        </div>
+        <div class="usage-card">
+          <div class="usage-top">
+            <span style="font-size:.87rem;font-weight:500">Conversation Usage</span>
+            <span style="font-size:.8rem;color:var(--muted)" id="usage-text">0 / 100 this month</span>
+          </div>
+          <div class="usage-bar"><div class="usage-fill" id="usage-fill" style="width:0%"></div></div>
+          <div class="usage-note" id="usage-note">Loading... <span style="color:var(--brand);cursor:pointer" onclick="goPage('billing',null)">Upgrade plan →</span></div>
+        </div>
+        <div class="chart-card">
+          <div style="display:flex;align-items:center;justify-content:space-between">
+            <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem">Conversations — last 7 days</div>
+          </div>
+          <div class="chart-wrap"><canvas id="convChart"></canvas></div>
+        </div>
+        <div class="qa-grid">
+          <div class="qa" onclick="goPage('bots',null)"><div class="qa-icon" style="background:rgba(79,142,247,0.1)">🤖</div><div><div style="font-size:.84rem;font-weight:500">Manage Bots</div><div style="font-size:.72rem;color:var(--muted)" id="qa-bots-txt">0 active</div></div></div>
+          <div class="qa" onclick="goPage('leads',null)"><div class="qa-icon" style="background:rgba(56,226,176,0.1)">📋</div><div><div style="font-size:.84rem;font-weight:500">View Leads</div><div style="font-size:.72rem;color:var(--muted)" id="qa-leads-txt">0 captured</div></div></div>
+          <div class="qa" onclick="openEmbed()"><div class="qa-icon" style="background:rgba(167,86,255,0.1)">⚡</div><div><div style="font-size:.84rem;font-weight:500">Get Embed Code</div><div style="font-size:.72rem;color:var(--muted)">Copy snippet</div></div></div>
+        </div>
+      </div>
+
+      <!-- BOTS -->
+      <div class="page" id="page-bots">
+        <div class="bots-list" id="botsList">
+          <div class="empty-state"><div class="e-icon">🤖</div><div class="e-title">No bots yet</div><div class="e-sub">Create your first bot to get started</div></div>
+        </div>
+        <div class="bot-card" style="border-style:dashed;justify-content:center;opacity:.5" onclick="openEmbed()">
+          <div style="font-size:.88rem;color:var(--muted)">+ Create new bot</div>
+        </div>
+      </div>
+
+      <!-- LEADS -->
+      <div class="page" id="page-leads">
+        <div class="card">
+          <div class="card-head">
+            <div class="card-title">Captured Leads</div>
+            <button class="tb-btn" onclick="exportLeads()">Export CSV</button>
+          </div>
+          <div class="tbl-wrap">
+            <table class="tbl">
+              <thead><tr><th>Name</th><th>Email</th><th>Score</th><th>Status</th><th>Date</th></tr></thead>
+              <tbody id="leadsBody"><tr><td colspan="5"><div class="empty-state" style="padding:2rem"><div class="e-icon">📋</div><div class="e-title">No leads yet</div><div class="e-sub">Leads will appear here when visitors interact with your bots</div></div></td></tr></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- ANALYTICS -->
+      <div class="page" id="page-analytics">
+        <div class="metrics">
+          <div class="metric"><div class="m-lbl">Avg Session</div><div class="m-val">4.2</div><div class="m-ch" style="color:var(--muted)">messages/chat</div></div>
+          <div class="metric"><div class="m-lbl">Resolution Rate</div><div class="m-val">78%</div><div class="m-ch up">↑ 5%</div></div>
+          <div class="metric"><div class="m-lbl">Lead Rate</div><div class="m-val">7.3%</div><div class="m-ch up">↑ 1.2%</div></div>
+          <div class="metric"><div class="m-lbl">Peak Hour</div><div class="m-val" style="font-size:1.3rem">2–4pm</div><div class="m-ch" style="color:var(--muted)">IST weekdays</div></div>
+        </div>
+        <div class="chart-card">
+          <div style="font-family:'Syne',sans-serif;font-weight:700;font-size:.9rem;margin-bottom:.85rem">Top questions asked</div>
+          <div style="position:relative;height:210px"><canvas id="topQChart"></canvas></div>
+        </div>
+      </div>
+
+      <!-- SETTINGS -->
+      <div class="page" id="page-settings">
+        <div class="settings-grid">
+          <div class="card">
+            <div class="card-head"><div class="card-title">Profile</div></div>
+            <div class="card-body">
+              <div class="s-field"><label>Full Name</label><input type="text" id="set-name" placeholder="Your name"></div>
+              <div class="s-field"><label>Business Name</label><input type="text" id="set-biz" placeholder="Your business"></div>
+              <div class="s-field"><label>Website</label><input type="url" id="set-url" placeholder="https://..."></div>
+              <button class="save-btn" onclick="saveProfile()">Save Profile</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div class="card-title">Change Password</div></div>
+            <div class="card-body">
+              <div class="s-field"><label>New Password</label><input type="password" id="set-pw" placeholder="Min 8 characters"></div>
+              <div class="s-field"><label>Confirm Password</label><input type="password" id="set-pw2" placeholder="Same as above"></div>
+              <button class="save-btn" onclick="changePassword()">Update Password</button>
+            </div>
+          </div>
+          <div class="card full">
+            <div class="card-head"><div class="card-title">Account Info</div></div>
+            <div class="card-body">
+              <div class="s-field"><label>Email (cannot change)</label><input type="email" id="set-email" disabled style="opacity:.5"></div>
+              <div class="s-field"><label>Member since</label><input type="text" id="set-joined" disabled style="opacity:.5"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BILLING -->
+      <div class="page" id="page-billing">
+        <div class="billing-grid">
+          <div class="card">
+            <div class="card-head"><div class="card-title">Current Plan</div></div>
+            <div class="card-body">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:1rem">
+                <div><div style="font-family:'Syne',sans-serif;font-size:1.3rem;font-weight:700" id="bill-plan">Free Trial</div><div style="color:var(--muted);font-size:.82rem;margin-top:.2rem" id="bill-price">14 days remaining</div></div>
+                <div style="background:rgba(79,142,247,0.12);color:var(--brand);font-size:.75rem;font-weight:500;padding:.3rem .75rem;border-radius:6px">Active</div>
+              </div>
+              <button class="save-btn" style="background:transparent;border:1px solid var(--border);color:var(--text)" onclick="window.location.href='pricing.html'">Upgrade Plan →</button>
+            </div>
+          </div>
+          <div class="card">
+            <div class="card-head"><div class="card-title">Usage</div></div>
+            <div class="card-body">
+              <div class="usage-bar" style="height:10px;margin-bottom:.6rem"><div class="usage-fill" id="bill-usage-fill" style="width:0%"></div></div>
+              <div style="font-size:.88rem;font-weight:500;margin-bottom:.3rem" id="bill-usage-text">0 / 100 conversations</div>
+              <div style="font-size:.78rem;color:var(--muted)">Resets monthly</div>
+            </div>
+          </div>
+          <div class="card full">
+            <div class="card-head"><div class="card-title">Payment History</div></div>
+            <div class="card-body" id="payHistory">
+              <div style="text-align:center;color:var(--muted);font-size:.85rem;padding:1rem">No payments yet</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- EMBED MODAL -->
+<div class="e-modal" id="embedModal" onclick="if(event.target===this)closeEmbed()">
+  <div class="e-card">
+    <div class="e-head"><div class="e-title">Your embed snippet</div><button class="e-close" onclick="closeEmbed()">×</button></div>
+    <p style="font-size:.83rem;color:var(--muted);margin-bottom:.85rem">Paste before &lt;/body&gt; on any website</p>
+    <div class="code-box">
+      <pre id="embedCode">&lt;script src="https://cdn.chatembed.io/widget.js"
+  data-bot-id="YOUR_BOT_ID"
+  data-color="#4F8EF7"
+  data-name="Aria"&gt;
+&lt;/script&gt;</pre>
+      <button class="copy-btn" onclick="copyEmbed(this)">Copy</button>
+    </div>
+    <div style="display:flex;justify-content:flex-end;gap:.6rem">
+      <button class="tb-btn" onclick="closeEmbed()">Close</button>
+      <button class="tb-btn primary" onclick="copyEmbed(this)">Copy Snippet</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════════════════
+   ⚠️ APNA SUPABASE CONFIG YAHAN DAALO
+   Supabase Dashboard → Settings → API
+═══════════════════════════════════════════════════════ */
+const SUPABASE_URL = 'https://oayumdzkezjgvopwjcgc.supabase.co';
+const SUPABASE_KEY = 'PASTE_YOUR_ANON_KEY_HERE';
+
+/* ── Supabase client init ── */
+const { createClient } = supabase;
+const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* ── State ── */
+let currentUser    = null;
+let currentProfile = null;
+let userBots       = [];
+let userLeads      = [];
+let userPayments   = [];
+let selectedPlan   = 'free_trial';
+let signupData     = {};
+let currentStep    = 1;
+let analyticsInited= false;
+let chartInited    = false;
+
+const PAGE_TITLES  = {overview:'Overview',bots:'My Bots',leads:'Leads',analytics:'Analytics',settings:'Settings',billing:'Billing'};
+
+/* ═══════════════════════════════════════════════════════
+   INIT — check session on load
+═══════════════════════════════════════════════════════ */
+async function init() {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session?.user) {
+      currentUser = session.user;
+      await loadProfile();
+      launchDash();
+    } else {
+      showAuth('loginPage');
+    }
+  } catch(e) {
+    console.error('Init error:', e);
+    showAuth('loginPage');
+  }
+  document.getElementById('loadingScreen').style.display = 'none';
+}
+
+/* ── Auth listener (handles OAuth redirects) ── */
+sb.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'SIGNED_IN' && session?.user && !currentUser) {
+    currentUser = session.user;
+    await loadProfile();
+    launchDash();
+    document.getElementById('loadingScreen').style.display = 'none';
+  }
+  if (event === 'SIGNED_OUT') {
+    currentUser = null; currentProfile = null;
+    showAuth('loginPage');
+  }
+});
+
+/* ═══════════════════════════════════════════════════════
+   AUTH HELPERS
+═══════════════════════════════════════════════════════ */
+function showAuth(pageId) {
+  document.querySelectorAll('.auth-page').forEach(p => p.classList.remove('active'));
+  document.getElementById('dashApp').classList.remove('active');
+  const el = document.getElementById(pageId);
+  if (el) el.classList.add('active');
+}
+
+function togglePw(inputId, btn) {
+  const inp = document.getElementById(inputId);
+  inp.type  = inp.type === 'password' ? 'text' : 'password';
+  btn.textContent = inp.type === 'password' ? '👁' : '🙈';
+}
+
+function showErr(id, msg) {
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(() => { if(el) el.style.display = 'none'; }, 5000);
+}
+function showOk(id, msg) {
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.textContent = msg; el.style.display = 'block';
+}
+function setBtn(btnId, spId, txtId, loading) {
+  const btn = document.getElementById(btnId);
+  const sp  = document.getElementById(spId);
+  const tx  = txtId ? document.getElementById(txtId) : null;
+  if(btn) btn.disabled = loading;
+  if(sp)  sp.style.display = loading ? 'block' : 'none';
+  if(tx)  tx.style.display = loading ? 'none'  : 'block';
+}
+function showToast(msg, type='success') {
+  const t = document.getElementById('toast');
+  t.textContent = (type === 'success' ? '✓ ' : '✗ ') + msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+/* ═══════════════════════════════════════════════════════
+   LOGIN
+═══════════════════════════════════════════════════════ */
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value.trim();
+  const pw    = document.getElementById('loginPw').value;
+  if (!email || !email.includes('@')) { showErr('loginErr','Valid email daalo'); return; }
+  if (!pw || pw.length < 6)           { showErr('loginErr','Password kam se kam 6 characters ka hona chahiye'); return; }
+  setBtn('loginBtn','loginSp','loginTxt', true);
+  const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
+  setBtn('loginBtn','loginSp','loginTxt', false);
+  if (error) { showErr('loginErr', error.message); return; }
+  currentUser = data.user;
+  await loadProfile();
+  launchDash();
+}
+
+async function googleLogin() {
+  const { error } = await sb.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.href }
+  });
+  if (error) showToast(error.message, 'error');
+}
+
+/* ═══════════════════════════════════════════════════════
+   SIGNUP — 3 STEPS
+═══════════════════════════════════════════════════════ */
+function gotoStep(n) {
+  document.getElementById('step' + currentStep).style.display = 'none';
+  currentStep = n;
+  document.getElementById('step' + n).style.display = 'block';
+  for(let i=1;i<=3;i++){
+    const d = document.getElementById('sd'+i);
+    d.classList.remove('active','done');
+    if(i < n)      d.classList.add('done');
+    else if(i===n) d.classList.add('active');
+  }
+}
+
+function nextStep(n) {
+  if(n===1) {
+    const fn = document.getElementById('s1Fname').value.trim();
+    const em = document.getElementById('s1Email').value.trim();
+    const pw = document.getElementById('s1Pw').value;
+    if(!fn)                    { showErr('s1Err','Naam daalo'); return; }
+    if(!em||!em.includes('@')) { showErr('s1Err','Valid email daalo'); return; }
+    if(!pw||pw.length<8)       { showErr('s1Err','Password kam se kam 8 characters ka hona chahiye'); return; }
+    signupData = { fname:fn, lname:document.getElementById('s1Lname').value.trim(), email:em, pw };
+    gotoStep(2);
+  } else if(n===2) {
+    const biz = document.getElementById('s2Biz').value.trim();
+    if(!biz) { showErr('s2Err','Business naam daalo'); return; }
+    signupData.business = biz;
+    signupData.url      = document.getElementById('s2Url').value.trim();
+    signupData.industry = document.getElementById('s2Ind').value;
+    gotoStep(3);
+  }
+}
+
+function selPlan(el) {
+  document.querySelectorAll('.plan-opt').forEach(p => p.classList.remove('sel'));
+  el.classList.add('sel');
+  selectedPlan = el.dataset.plan;
+  document.getElementById('s3Txt').textContent =
+    selectedPlan === 'free_trial' ? 'Start Free Trial →' : 'Create Account & Pay →';
+}
+
+async function completeSignup() {
+  setBtn('s3Btn','s3Sp','s3Txt', true);
+  const { data, error } = await sb.auth.signUp({
+    email    : signupData.email,
+    password : signupData.pw,
+    options  : {
+      data: {
+        full_name     : signupData.fname + (signupData.lname ? ' '+signupData.lname : ''),
+        business_name : signupData.business,
+        website_url   : signupData.url,
+        industry      : signupData.industry,
+        plan          : selectedPlan,
+      }
+    }
+  });
+  setBtn('s3Btn','s3Sp','s3Txt', false);
+  if(error) { showErr('s3Err', error.message); return; }
+
+  /* Update profile with extra data */
+  if(data.user) {
+    await sb.from('profiles').upsert({
+      id            : data.user.id,
+      full_name     : signupData.fname + (signupData.lname ? ' '+signupData.lname : ''),
+      business_name : signupData.business,
+      website_url   : signupData.url,
+      industry      : signupData.industry,
+      plan          : selectedPlan,
+      convos_limit  : selectedPlan === 'free_trial' ? 100 : selectedPlan === 'starter' ? 500 : selectedPlan === 'growth' ? 2500 : 10000,
+    });
+    currentUser = data.user;
+  }
+
+  /* Check if email confirmation required */
+  if(data.user && !data.session) {
+    showAuth('loginPage');
+    showOk('loginOk','✓ Account banaya! Apna email check karo aur verify karo, phir login karo.');
+    return;
+  }
+
+  if(selectedPlan !== 'free_trial') {
+    window.location.href = 'pricing.html';
+    return;
+  }
+  await loadProfile();
+  launchDash();
+}
+
+/* ═══════════════════════════════════════════════════════
+   FORGOT PASSWORD
+═══════════════════════════════════════════════════════ */
+async function doForgot() {
+  const email = document.getElementById('forgotEmail').value.trim();
+  if(!email||!email.includes('@')) { showErr('forgotErr','Valid email daalo'); return; }
+  document.getElementById('forgotTxt').style.display='none';
+  document.getElementById('forgotSp').style.display='block';
+  const { error } = await sb.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.href
+  });
+  document.getElementById('forgotSp').style.display='none';
+  document.getElementById('forgotTxt').style.display='block';
+  if(error) { showErr('forgotErr', error.message); return; }
+  showOk('forgotOk','✓ Reset link bheja gaya! Inbox check karo.');
+}
+
+/* ═══════════════════════════════════════════════════════
+   LOAD DATA FROM SUPABASE
+═══════════════════════════════════════════════════════ */
+async function loadProfile() {
+  if(!currentUser) return;
+  const { data } = await sb.from('profiles').select('*').eq('id', currentUser.id).single();
+  currentProfile = data;
+}
+
+async function loadBots() {
+  if(!currentUser) return;
+  const { data } = await sb.from('bots').select('*').eq('user_id', currentUser.id).order('created_at', { ascending: false });
+  userBots = data || [];
+  renderBots();
+  updateMetrics();
+}
+
+async function loadLeads() {
+  if(!currentUser) return;
+  const { data } = await sb.from('leads').select('*').eq('user_id', currentUser.id).order('captured_at', { ascending: false }).limit(50);
+  userLeads = data || [];
+  renderLeads();
+}
+
+async function loadPayments() {
+  if(!currentUser) return;
+  const { data } = await sb.from('payments').select('*').eq('user_id', currentUser.id).order('paid_at', { ascending: false });
+  userPayments = data || [];
+  renderPayments();
+}
+
+/* ═══════════════════════════════════════════════════════
+   RENDER DATA
+═══════════════════════════════════════════════════════ */
+function renderBots() {
+  const list = document.getElementById('botsList');
+  if(!userBots.length) {
+    list.innerHTML = `<div class="empty-state"><div class="e-icon">🤖</div><div class="e-title">No bots yet</div><div class="e-sub">Click "+ New Bot" to create your first chatbot</div></div>`;
+    return;
+  }
+  list.innerHTML = userBots.map(b => `
+    <div class="bot-card">
+      <div class="bot-av" style="background:rgba(79,142,247,0.12)">${b.emoji||'💬'}</div>
+      <div class="bot-info">
+        <div class="bot-name">${b.name}</div>
+        <div class="bot-url">${b.website_url||'No URL set'}</div>
+      </div>
+      <div class="bot-stats">
+        <div class="bs"><div class="bs-val">${b.convos_count||0}</div><div class="bs-lbl">convos</div></div>
+        <div class="bs"><div class="bs-val">${b.leads_count||0}</div><div class="bs-lbl">leads</div></div>
+      </div>
+      <div class="status-pill ${b.status==='live'?'live':'draft'}">● ${b.status==='live'?'Live':'Draft'}</div>
+      <div style="display:flex;gap:.4rem">
+        <button class="icon-btn" onclick="goPage('settings',null)">✏️</button>
+        <button class="icon-btn" onclick="openEmbed('${b.id}','${b.name}','${b.primary_color||'#4F8EF7'}')">{ }</button>
+      </div>
+    </div>`).join('');
+}
+
+function renderLeads() {
+  const tbody = document.getElementById('leadsBody');
+  if(!userLeads.length) {
+    tbody.innerHTML = `<tr><td colspan="5"><div class="empty-state" style="padding:2rem"><div class="e-icon">📋</div><div class="e-title">No leads yet</div><div class="e-sub">Leads will appear when visitors submit their email in your chatbot</div></div></td></tr>`;
+    return;
+  }
+  const scoreColor = s => s>=70?'var(--brand2)':s>=40?'var(--warn)':'var(--muted)';
+  const tagClass   = s => s>=70?'hot':s>=40?'warm':'cold';
+  const tagName    = s => s>=70?'Hot':s>=40?'Warm':'Cold';
+  tbody.innerHTML = userLeads.map(l => `
+    <tr>
+      <td><div style="display:flex;align-items:center;gap:.5rem"><div class="lead-av" style="background:rgba(79,142,247,0.15);color:var(--brand)">${(l.name||l.email||'?').substring(0,2).toUpperCase()}</div>${l.name||'—'}</div></td>
+      <td style="color:var(--muted)">${l.email}</td>
+      <td><div class="score-wrap"><span style="font-size:.78rem">${l.score||50}%</span><div class="score-bar"><div class="score-fill" style="width:${l.score||50}%;background:${scoreColor(l.score||50)}"></div></div></div></td>
+      <td><span class="tag ${tagClass(l.score||50)}">${tagName(l.score||50)}</span></td>
+      <td style="color:var(--muted);font-size:.78rem">${new Date(l.captured_at).toLocaleDateString('en-IN')}</td>
+    </tr>`).join('');
+}
+
+function renderPayments() {
+  const el = document.getElementById('payHistory');
+  if(!userPayments.length) {
+    el.innerHTML = '<div style="text-align:center;color:var(--muted);font-size:.85rem;padding:1rem">No payments yet</div>';
+    return;
+  }
+  el.innerHTML = userPayments.map(p => `
+    <div class="bill-row">
+      <span>${new Date(p.paid_at).toLocaleDateString('en-IN')}</span>
+      <span style="color:var(--muted)">${p.plan} — ${p.billing_type}</span>
+      <span>${p.currency==='INR'?'₹':'$'}${(p.amount/100).toLocaleString()}</span>
+      <span class="paid-tag">Paid</span>
+    </div>`).join('');
+}
+
+function updateMetrics() {
+  const activeBots = userBots.filter(b => b.status==='live').length;
+  const totalConvos= userBots.reduce((s,b) => s+(b.convos_count||0), 0);
+  const limit      = currentProfile?.convos_limit || 100;
+  const pct        = Math.min(Math.round((totalConvos/limit)*100), 100);
+
+  document.getElementById('m-convos').textContent = totalConvos.toLocaleString();
+  document.getElementById('m-leads').textContent  = userLeads.length;
+  document.getElementById('m-bots').textContent   = activeBots;
+  document.getElementById('m-bots-ch').textContent= `of ${currentProfile?.convos_limit>500?3:1} allowed`;
+  document.getElementById('qa-bots-txt').textContent  = `${activeBots} active`;
+  document.getElementById('qa-leads-txt').textContent = `${userLeads.length} captured`;
+
+  document.getElementById('usage-text').textContent  = `${totalConvos} / ${limit} this month`;
+  document.getElementById('usage-fill').style.width  = pct + '%';
+  document.getElementById('usage-note').innerHTML    = `${limit-totalConvos} conversations remaining · <span style="color:var(--brand);cursor:pointer" onclick="goPage('billing',null)">Upgrade plan →</span>`;
+
+  document.getElementById('bill-usage-fill').style.width = pct + '%';
+  document.getElementById('bill-usage-text').textContent = `${totalConvos} / ${limit} conversations`;
+  document.getElementById('bill-plan').textContent  = currentProfile?.plan || 'Free Trial';
+  document.getElementById('bill-price').textContent = currentProfile?.plan === 'free_trial' ? 'Trial active' : 'Active subscription';
+}
+
+/* ═══════════════════════════════════════════════════════
+   LAUNCH DASHBOARD
+═══════════════════════════════════════════════════════ */
+function launchDash() {
+  document.querySelectorAll('.auth-page').forEach(p => p.classList.remove('active'));
+  document.getElementById('dashApp').classList.add('active');
+
+  const name     = currentProfile?.full_name || currentUser?.user_metadata?.full_name || currentUser?.email || 'User';
+  const email    = currentUser?.email || '';
+  const initials = name.split(' ').map(w=>w[0]).join('').substring(0,2).toUpperCase() || 'U';
+  const plan     = currentProfile?.plan || 'free_trial';
+
+  document.getElementById('uName').textContent      = name;
+  document.getElementById('uEmail').textContent     = email;
+  document.getElementById('uAv').textContent        = initials;
+  document.getElementById('planBadge').textContent  = plan.replace('_',' ').replace(/\b\w/g,c=>c.toUpperCase()) + ' Plan';
+
+  /* Prefill settings */
+  document.getElementById('set-name').value   = currentProfile?.full_name || '';
+  document.getElementById('set-biz').value    = currentProfile?.business_name || '';
+  document.getElementById('set-url').value    = currentProfile?.website_url || '';
+  document.getElementById('set-email').value  = email;
+  document.getElementById('set-joined').value = currentProfile?.joined_at ? new Date(currentProfile.joined_at).toLocaleDateString('en-IN') : 'Today';
+
+  /* Load data */
+  loadBots();
+  loadLeads();
+  loadPayments();
+  initChart();
+}
+
+/* ═══════════════════════════════════════════════════════
+   NAVIGATION
+═══════════════════════════════════════════════════════ */
+function goPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if(btn) btn.classList.add('active');
+  else document.querySelectorAll('.nav-item').forEach(n => { if(n.getAttribute('onclick')?.includes(id)) n.classList.add('active'); });
+  document.getElementById('pageTitle').textContent = PAGE_TITLES[id]||id;
+  if(id==='analytics' && !analyticsInited) { analyticsInited=true; setTimeout(initAnalyticsChart, 80); }
+  if(window.innerWidth<=900) closeSidebar();
+}
+
+/* ── Sidebar mobile ── */
+function toggleSidebar() {
+  const sb  = document.getElementById('mainSidebar');
+  const ov  = document.getElementById('mobOverlay');
+  const btn = document.getElementById('mobHam');
+  sb.classList.toggle('open'); ov.classList.toggle('open'); btn.classList.toggle('active');
+}
+function closeSidebar() {
+  document.getElementById('mainSidebar').classList.remove('open');
+  document.getElementById('mobOverlay').classList.remove('open');
+  document.getElementById('mobHam').classList.remove('active');
+}
+
+/* ═══════════════════════════════════════════════════════
+   SETTINGS ACTIONS
+═══════════════════════════════════════════════════════ */
+async function saveProfile() {
+  if(!currentUser) return;
+  const { error } = await sb.from('profiles').update({
+    full_name     : document.getElementById('set-name').value.trim(),
+    business_name : document.getElementById('set-biz').value.trim(),
+    website_url   : document.getElementById('set-url').value.trim(),
+  }).eq('id', currentUser.id);
+  if(error) showToast(error.message, 'error');
+  else { showToast('Profile saved!'); await loadProfile(); }
+}
+
+async function changePassword() {
+  const pw  = document.getElementById('set-pw').value;
+  const pw2 = document.getElementById('set-pw2').value;
+  if(pw.length < 8)   { showToast('Password kam se kam 8 characters ka hona chahiye','error'); return; }
+  if(pw !== pw2)      { showToast('Passwords match nahi kar rahe','error'); return; }
+  const { error } = await sb.auth.updateUser({ password: pw });
+  if(error) showToast(error.message,'error');
+  else showToast('Password updated!');
+}
+
+/* ═══════════════════════════════════════════════════════
+   LOGOUT
+═══════════════════════════════════════════════════════ */
+async function doLogout() {
+  if(!confirm('Sign out karna chahte ho?')) return;
+  await sb.auth.signOut();
+  currentUser = null; currentProfile = null;
+  userBots = []; userLeads = []; userPayments = [];
+  chartInited = false; analyticsInited = false;
+  showAuth('loginPage');
+}
+
+/* ═══════════════════════════════════════════════════════
+   EMBED MODAL
+═══════════════════════════════════════════════════════ */
+function openEmbed(botId='YOUR_BOT_ID', name='Aria', color='#4F8EF7') {
+  document.getElementById('embedCode').textContent =
+    `<script src="https://cdn.chatembed.io/widget.js"\n  data-bot-id="${botId}"\n  data-color="${color}"\n  data-name="${name}">\n<\/script>`;
+  document.getElementById('embedModal').classList.add('open');
+}
+function closeEmbed() { document.getElementById('embedModal').classList.remove('open'); }
+function copyEmbed(btn) {
+  navigator.clipboard.writeText(document.getElementById('embedCode').textContent).catch(()=>{});
+  const orig = btn.textContent; btn.textContent = 'Copied!';
+  setTimeout(() => btn.textContent = orig, 2000);
+}
+
+/* ═══════════════════════════════════════════════════════
+   EXPORT LEADS CSV
+═══════════════════════════════════════════════════════ */
+function exportLeads() {
+  if(!userLeads.length) { showToast('No leads to export','error'); return; }
+  const rows = [['Name','Email','Phone','Score','Status','Date'], ...userLeads.map(l=>[l.name||'',l.email,l.phone||'',l.score||50,l.status||'new',new Date(l.captured_at).toLocaleDateString()])];
+  const csv  = rows.map(r=>r.join(',')).join('\n');
+  const blob = new Blob([csv],{type:'text/csv'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a'); a.href=url; a.download='chatembed_leads.csv'; a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ═══════════════════════════════════════════════════════
+   CHARTS
+═══════════════════════════════════════════════════════ */
+const MU='#8896B0',BL='#4F8EF7',GR='#38E2B0';
+
+function initChart() {
+  if(chartInited) return; chartInited = true;
+  const ctx = document.getElementById('convChart');
+  if(!ctx) return;
+  new Chart(ctx.getContext('2d'), {
+    type:'line',
+    data:{
+      labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+      datasets:[{label:'Conversations',data:[0,0,0,0,0,0,0],borderColor:BL,backgroundColor:'rgba(79,142,247,0.07)',fill:true,tension:.4,pointRadius:3,pointBackgroundColor:BL,borderWidth:2}]
+    },
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:MU,font:{size:11}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:MU,font:{size:11}},beginAtZero:true}}}
+  });
+}
+
+function initAnalyticsChart() {
+  new Chart(document.getElementById('topQChart').getContext('2d'), {
+    type:'bar',
+    data:{labels:['Pricing?','Shipping?','Refund policy','How to order?','Contact info'],datasets:[{data:[312,245,189,156,98],backgroundColor:BL,borderRadius:4}]},
+    options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:MU,font:{size:11}}},y:{grid:{display:false},ticks:{color:MU,font:{size:11}}}}}
+  });
+}
+
+/* Boot */
+init();
+</script>
+</body>
+</html>
